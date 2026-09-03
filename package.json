@@ -4,9 +4,16 @@
   "private": true,
   "description": "基于 Skia（CanvasKit）渲染 B 站动态卡片",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepare": "tsc"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
