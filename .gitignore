@@ -1,0 +1,29 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 测试生成的图片产物（可由 examples 下的脚本重新生成）
+examples/*.png
+
+# 日志
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# 环境变量（如后续接入 B 站 Cookie 等敏感配置）
+.env
+.env.*
+!.env.example
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
