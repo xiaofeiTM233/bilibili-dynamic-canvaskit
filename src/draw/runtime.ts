@@ -14,6 +14,7 @@ import { makeLTRB, type Rect } from '../core/geometry';
 import { makeFont, makeFontMgr, matchTypeface, type CK, type SkFontMgr } from '../core/skia';
 import type { TextEnv } from '../core/text';
 import { ImageStore } from '../utils/images';
+import { ensureDefaultFont } from '../utils/fonts';
 
 export interface RuntimeOptions {
   imageConfig?: ImageConfig;
@@ -25,6 +26,11 @@ export interface RuntimeOptions {
   emojiFontBuffer?: Uint8Array | null;
   /** 粉丝卡片数字字体，对应 font/FansCard.ttf */
   fansCardFontBuffer?: Uint8Array | null;
+  /**
+   * 字体目录；未提供 fontBuffers 时，若该目录中无默认字体
+   * （LXGWWenKai-Bold.ttf）则自动下载，默认 <cwd>/font
+   */
+  fontDir?: string;
   /** 是否下载原图，对应 cacheConfig.downloadOriginal */
   downloadOriginal?: boolean;
   /** 图片请求头 */
@@ -74,7 +80,13 @@ export async function createRuntime(ck: CK, options: RuntimeOptions = {}): Promi
   if (options.fansCardFontBuffer) buffers.push(options.fansCardFontBuffer);
 
   if (buffers.length === 0) {
-    throw new Error('至少需要提供一个字体文件，否则无法进行文本排版');
+    // 对应 loadFonts：font 目录为空时自动下载默认字体 LXGWWenKai-Medium.ttf
+    const autoFont = await ensureDefaultFont({ fontDir: options.fontDir });
+    if (autoFont) {
+      buffers.push(new Uint8Array(autoFont));
+    } else {
+      throw new Error('未提供字体且默认字体下载失败，请手动放置字体文件到 font 目录，或通过 fontBuffers 传入');
+    }
   }
 
   const fontMgr = makeFontMgr(ck, buffers);

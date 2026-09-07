@@ -63,7 +63,7 @@ fs.writeFileSync('card.png', final.encodeToBytes());
 
 ## 字体配置
 
-字体通过 `createRuntime(ck, options)` 的 `RuntimeOptions` 显式传入，**不设自动下载**（与原插件「font 目录为空时自动下载霞鹜文楷」的行为不同）。
+字体通过 `createRuntime(ck, options)` 的 `RuntimeOptions` 传入。**未提供 `fontBuffers` 时自动下载默认字体**：检测字体目录（默认 `<cwd>/font`，可用 `fontDir` 指定）中是否存在 `LXGWWenKai-Medium.ttf`，不存在则按「霞鹜文楷官方仓库直链 → GitHub 加速代理」顺序逐源下载，已有则直接使用；全部失败时报错并提示手动放置。
 
 ```typescript
 const rt = await createRuntime(ck, {
@@ -84,8 +84,8 @@ const rt = await createRuntime(ck, {
 
 | 字体 | 说明 |
 | --- | --- |
-| 霞鹜文楷 (LXGW WenKai) | 使用 **bold** 字重；原插件默认自动下载的就是它 |
-| HarmonyOS Sans SC | 使用**简体中文**目录的 **Medium** 字重 |
+| 霞鹜文楷 (LXGW WenKai) | 默认自动下载 `LXGWWenKai-Medium.ttf`（官方当前最粗字重；Bold 仅存在于旧版打包，官方已不再提供） |
+| HarmonyOS Sans SC | 有 Bold 字重，HarmonyOS Design 资源页下载 |
 | SimHei（黑体） | Windows 系统自带 `C:\Windows\Fonts\simhei.ttf`，零成本可用 |
 
 注意事项：

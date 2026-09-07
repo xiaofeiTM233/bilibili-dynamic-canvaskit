@@ -4,6 +4,9 @@ node_modules/
 # 构建产物
 dist/
 
+# 自动下载的默认字体（首次运行时由 prepare/createRuntime 下载）
+font/
+
 # 测试生成的图片产物（可由 examples 下的脚本重新生成）
 examples/*.png
 
