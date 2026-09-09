@@ -131,8 +131,8 @@ export const THEME_PRESETS: Record<string, Theme> = {
   },
 };
 
-export function resolveTheme(key: string): Theme {
-  return THEME_PRESETS[key] ?? THEME_PRESETS['v3'];
+export function resolveTheme(key: string | Theme): Theme {
+  return (typeof key === 'object' && key != null ? key : THEME_PRESETS[key]) ?? THEME_PRESETS['v3'];
 }
 
 /** 主题派生值，对应 Kotlin 中的 get() 属性 */

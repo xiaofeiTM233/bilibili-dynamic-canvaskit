@@ -22,8 +22,8 @@ export interface BadgeEnableConfig {
 }
 
 export interface ImageConfig {
-  quality: string;
-  theme: string;
+  quality: string | Quality;
+  theme: string | Theme;
   font: string;
   defaultColor: string;
   cardOrnament: 'FanCard' | 'QrCode' | 'None';

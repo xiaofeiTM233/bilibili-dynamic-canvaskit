@@ -178,7 +178,7 @@ export const QUALITY_PRESETS: Record<string, Quality> = {
  * 注意：Kotlin 端在 badgeEnable.enable 为 false 时会将 badgeHeight 置 0，
  * 该副作用在此处一并还原。
  */
-export function resolveQuality(key: string, badgeEnable: boolean): Quality {
-  const base = QUALITY_PRESETS[key] ?? QUALITY_PRESETS['800w'];
+export function resolveQuality(key: string | Quality, badgeEnable: boolean): Quality {
+  const base = (typeof key === 'object' && key != null ? key : QUALITY_PRESETS[key]) ?? QUALITY_PRESETS['800w'];
   return { ...base, badgeHeight: badgeEnable ? base.badgeHeight : 0 };
 }
