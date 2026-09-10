@@ -669,12 +669,17 @@ function rectH(r: Rect | RRect): number {
 }
 
 function inflateRRect(r: RRect, delta: number): RRect {
+  // skiko 的 RRect.inflate 基于 SkRRect::outset：radii 随矩形同步缩放（clamp 到短边一半）
+  const w = r.right - r.left;
+  const h = r.bottom - r.top;
+  const maxR = Math.min(w, h) / 2;
+  const adj = (v: number) => Math.max(0, Math.min(v + delta, maxR));
   return {
     left: r.left - delta,
     top: r.top - delta,
     right: r.right + delta,
     bottom: r.bottom + delta,
-    radii: r.radii,
+    radii: typeof r.radii === 'number' ? adj(r.radii) : (r.radii.map(adj) as [number, number, number, number]),
   };
 }
 

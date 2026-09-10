@@ -138,6 +138,28 @@ export interface ShadowConfig {
   shadowColor: ColorInt;
 }
 
+const isRRect = (r: Rect | RRect): r is RRect => 'radii' in (r as RRect);
+
+/**
+ * Rect/RRect 通用的 inflate。
+ * RRect 时 radii 随矩形同步缩放并 clamp 到短边一半（SkRRect::outset 语义，
+ * skiko 的 RRect.inflate 即基于此），这是头像外扩后仍为正圆的关键。
+ */
+function inflateSkShape(r: Rect | RRect, delta: number): Rect | RRect {
+  if (!isRRect(r)) return inflate(r, delta);
+  const w = r.right - r.left;
+  const h = r.bottom - r.top;
+  const maxR = Math.min(w, h) / 2;
+  const adj = (v: number) => Math.max(0, Math.min(v + delta, maxR));
+  return {
+    left: r.left - delta,
+    top: r.top - delta,
+    right: r.right + delta,
+    bottom: r.bottom + delta,
+    radii: typeof r.radii === 'number' ? adj(r.radii) : (r.radii.map(adj) as [number, number, number, number]),
+  };
+}
+
 /**
  * 绘制矩形阴影（不裁剪内部）。
  *
@@ -155,7 +177,7 @@ function drawRectShadowNoclip(
   spread: number,
   color: ColorInt,
 ): void {
-  const target = inflate(r, spread);
+  const target = inflateSkShape(r, spread);
   withPaint(ctx.ck, (p) => {
     p.setColor(toSkColor(ctx.ck, color));
     p.setStyle(ctx.ck.PaintStyle.Fill);
@@ -163,14 +185,16 @@ function drawRectShadowNoclip(
     p.setMaskFilter(ctx.ck.MaskFilter.MakeBlur(ctx.ck.BlurStyle.Normal, blur / 2, true));
     ctx.canvas.save();
     ctx.canvas.translate(dx, dy);
-    ctx.canvas.drawRect(toSkRect(target), p);
+    if (isRRect(target)) ctx.canvas.drawRRect(toSkRRect(target), p);
+    else ctx.canvas.drawRect(toSkRect(target), p);
     ctx.canvas.restore();
   });
 }
 
 /**
  * 仅绘制矩形外部阴影：先以 Difference 挖空内部，再绘制阴影，从而避免出现内部灰边。
- * 对应 drawRectShadowAntiAlias。
+ * 对应 drawRectShadowAntiAlias。RRect 入参时内外裁剪均保持圆角
+ * （skiko 中 RRect extends Rect，Kotlin 端 `insides is RRect` 分支即此语义）。
  */
 export function drawRectShadowAntiAlias(
   ctx: SkCtx,
@@ -181,15 +205,19 @@ export function drawRectShadowAntiAlias(
   spread: number,
   color: ColorInt,
 ): void {
-  const insides = inflate(r, -1);
-  if (isEmpty(insides)) {
+  const insides = inflateSkShape(r, -1);
+  if (isEmpty(insides as Rect)) {
     drawRectShadowNoclip(ctx, r, dx, dy, blur, spread, color);
     return;
   }
 
   ctx.canvas.save();
-  // Skia: clipRect(insides, ClipMode.DIFFERENCE, true)
-  ctx.canvas.clipRect(toSkRect(insides), ctx.ck.ClipOp.Difference, true);
+  // Skia: if (insides is RRect) clipRRect(insides, ClipMode.DIFFERENCE, true) else clipRect(...)
+  if (isRRect(insides)) {
+    ctx.canvas.clipRRect(toSkRRect(insides), ctx.ck.ClipOp.Difference, true);
+  } else {
+    ctx.canvas.clipRect(toSkRect(insides), ctx.ck.ClipOp.Difference, true);
+  }
   drawRectShadowNoclip(ctx, r, dx, dy, blur, spread, color);
   ctx.canvas.restore();
 }
