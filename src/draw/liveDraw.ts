@@ -98,12 +98,12 @@ export async function drawLiveAvatar(
     const tar = makeXYWH(rectW(rt.cardRect) - qr.width() - Math.abs(qy), qy + quality.cardPadding, qr.width(), qr.height());
     withPaint(rt.ck, (p) => {
       p.setAntiAlias(true);
-      ctx.canvas.drawImageRect(
+      ctx.canvas.drawImageRectOptions(
         qr,
         toSkRect(makeXYWH(0, 0, qr.width(), qr.height())),
         toSkRect(tar),
-        p,
-        true,
+        rt.ck.FilterMode.Linear,
+        rt.ck.MipmapMode.None,
       );
     });
     qr.delete();

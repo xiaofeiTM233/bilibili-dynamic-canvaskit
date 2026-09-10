@@ -191,12 +191,12 @@ export async function drawContentDesc(
           y += emojiSize + quality.lineSpace;
         }
         withTempPaint(rt, ctx, (p) => {
-          ctx.canvas.drawImageRect(
+          ctx.canvas.drawImageRectOptions(
             img,
             new Float32Array([0, 0, img.width(), img.height()]),
             new Float32Array([x, y - emojiSize * 0.8, x + emojiSize, y - emojiSize * 0.8 + emojiSize]),
-            p,
-            true,
+            rt.ck.FilterMode.Linear,
+            rt.ck.MipmapMode.None,
           );
         });
         x += emojiSize;

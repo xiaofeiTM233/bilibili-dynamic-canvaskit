@@ -116,12 +116,12 @@ export async function drawAvatar(
       );
       withPaint(rt.ck, (p) => {
         p.setAntiAlias(true);
-        ctx.canvas.drawImageRect(
+        ctx.canvas.drawImageRectOptions(
           pendantImg,
           toSkRect(makeXYWH(0, 0, pendantImg.width(), pendantImg.height())),
           toSkRect(tarPendantRect),
-          p,
-          true,
+          rt.ck.FilterMode.Linear,
+          rt.ck.MipmapMode.None,
         );
       });
     }
@@ -279,12 +279,12 @@ export async function drawOrnament(
 
     withPaint(rt.ck, (p) => {
       p.setAntiAlias(true);
-      ctx.canvas.drawImageRect(
+      ctx.canvas.drawImageRectOptions(
         fanImg,
         toSkRect(makeXYWH(0, 0, fanImg.width(), fanImg.height())),
         toSkRect(tarFRect),
-        p,
-        true,
+        rt.ck.FilterMode.Linear,
+        rt.ck.MipmapMode.None,
       );
     });
 
@@ -318,12 +318,12 @@ export async function drawOrnament(
     );
     withPaint(rt.ck, (p) => {
       p.setAntiAlias(true);
-      ctx.canvas.drawImageRect(
+      ctx.canvas.drawImageRectOptions(
         qrCodeImg,
         toSkRect(makeXYWH(0, 0, qrCodeImg.width(), qrCodeImg.height())),
         toSkRect(tarFRect),
-        p,
-        true,
+        rt.ck.FilterMode.Linear,
+        rt.ck.MipmapMode.None,
       );
     });
     qrCodeImg.delete();

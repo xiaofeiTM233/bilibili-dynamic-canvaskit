@@ -251,12 +251,12 @@ export async function drawTextArea(
         const src = makeXYWH(0, 0, emojiImg.width(), emojiImg.height());
         const dst = makeXYWH(x, y - emojiHeight * 0.8, emojiHeight * 0.9, emojiHeight * 0.9);
         paint.setAlphaf(1);
-        ctx.canvas.drawImageRect(
+        ctx.canvas.drawImageRectOptions(
           emojiImg as never,
           toSkRect(src),
           toSkRect(dst),
-          paint,
-          true,
+          ctx.ck.FilterMode.Linear,
+          ctx.ck.MipmapMode.None,
         );
       }
       x += emojiHeight;

@@ -252,15 +252,16 @@ export function drawImageRRect(
   withPaint(ctx.ck, (p) => {
     p.setAntiAlias(true);
     p.setAlphaf(alpha);
-    // drawImageRect 默认线性采样，对应 FilterMipmap(FilterMode.LINEAR, MipmapMode.NEAREST)
+    // 对应 FilterMipmap(FilterMode.LINEAR, MipmapMode.NEAREST)：显式双线性采样，
+    // CanvasKit drawImageRect 的默认采样偏锐，必须显式对齐原实现的柔和语义
     ctx.canvas.save();
     ctx.canvas.clipRRect(toSkRRect(rRect), ctx.ck.ClipOp.Intersect, true);
-    ctx.canvas.drawImageRect(
+    ctx.canvas.drawImageRectOptions(
       image,
       toSkRect(srcRect),
       toSkRect({ left: rRect.left, top: rRect.top, right: rRect.right, bottom: rRect.bottom }),
-      p,
-      false,
+      ctx.ck.FilterMode.Linear,
+      ctx.ck.MipmapMode.None,
     );
     ctx.canvas.restore();
   });
@@ -290,7 +291,14 @@ export function drawScaleWidthImage(
   withPaint(ctx.ck, (p) => {
     p.setAntiAlias(true);
     p.setAlphaf(alpha);
-    ctx.canvas.drawImageRect(image, toSkRect(src), toSkRect(dst), p, false);
+    // 对应 FilterMipmap(FilterMode.LINEAR, MipmapMode.NEAREST)，见 drawImageRRect 注释
+    ctx.canvas.drawImageRectOptions(
+      image,
+      toSkRect(src),
+      toSkRect(dst),
+      ctx.ck.FilterMode.Linear,
+      ctx.ck.MipmapMode.None,
+    );
   });
 }
 
