@@ -110,7 +110,7 @@ export async function drawLiveAvatar(
   }
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -206,7 +206,7 @@ export async function drawLive(
   avatar.delete();
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -241,7 +241,7 @@ export function composeLiveCard(rt: DrawRuntime, card: SkImage, colors: ColorInt
 
   ctx.canvas.drawImage(card, 0, 0);
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 

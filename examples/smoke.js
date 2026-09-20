@@ -50,7 +50,7 @@ async function main() {
   builder.delete();
   fontMgr.delete();
   img.delete();
-  surface.delete();
+  surface.dispose(); // Surface 必须用 dispose()：MakeSurface 自分配的像素缓冲只在 dispose() 里释放
 
   console.log('SMOKE OK');
 }

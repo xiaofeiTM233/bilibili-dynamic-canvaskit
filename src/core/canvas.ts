@@ -8,6 +8,8 @@
  *
  * 内存约定：CanvasKit 的 Paint / Image 等 Embind 对象需显式 delete()，
  * 本模块内的临时 Paint 由 withPaint 统一回收；调用方持有的 Image 生命周期由调用方负责。
+ * Surface 例外：MakeSurface 自行分配的像素缓冲只能由 dispose() 释放，必须用 dispose() 而非 delete()
+ * （见 core/skia.ts 头部说明）。
  */
 
 import type { Canvas, Image as SkImage, Paint } from 'canvaskit-wasm';

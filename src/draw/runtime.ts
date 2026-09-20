@@ -45,6 +45,10 @@ export interface RuntimeFonts {
   /** 粉丝卡片字体，未配置时为 null */
   fansCard: SkFont | null;
   mainTypeface: SkTypeface | null;
+  /** emoji Typeface，由 MakeFreeTypeFaceFromData 创建，需随运行时释放 */
+  emojiTypeface: SkTypeface | null;
+  /** 粉丝卡片 Typeface，由 MakeFreeTypeFaceFromData 创建，需随运行时释放 */
+  fansCardTypeface: SkTypeface | null;
 }
 
 export interface DrawRuntime {
@@ -132,6 +136,8 @@ export async function createRuntime(ck: CK, options: RuntimeOptions = {}): Promi
         ? makeFont(ck, fansCardTypeface, quality.subTitleFontSize)
         : null,
       mainTypeface,
+      emojiTypeface,
+      fansCardTypeface,
     },
     fontMgr,
     cardRect,
@@ -144,10 +150,20 @@ export async function createRuntime(ck: CK, options: RuntimeOptions = {}): Promi
   };
 }
 
-/** 释放运行时持有的资源 */
+/**
+ * 释放运行时持有的资源
+ *
+ * 释放顺序：先 Font（持有 Typeface 引用）-> 再 Typeface -> 最后 FontMgr。
+ * 这四类都是 Embind 对象，不释放的话每次 createRuntime 都会把字体数据（默认字体约 20MB）
+ * 永久留在 WASM 堆里，反复重建运行时的调用方（如直接使用 renderDynamicCard）会把堆吃光。
+ */
 export function disposeRuntime(rt: DrawRuntime): void {
   rt.fonts.main.delete();
   if (rt.fonts.emoji) rt.fonts.emoji.delete();
   if (rt.fonts.fansCard) rt.fonts.fansCard.delete();
+  rt.fonts.mainTypeface?.delete();
+  rt.fonts.emojiTypeface?.delete();
+  rt.fonts.fansCardTypeface?.delete();
+  rt.fontMgr.delete();
   rt.store.dispose();
 }

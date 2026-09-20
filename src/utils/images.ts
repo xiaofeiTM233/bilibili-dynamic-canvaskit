@@ -107,7 +107,7 @@ export class ImageStore {
     const surface = this.ck.MakeSurface(2, 2);
     if (!surface) throw new Error('无法创建占位图 Surface');
     const image = surface.makeImageSnapshot();
-    surface.delete();
+    surface.dispose();
     this.missImage = image;
     return image;
   }

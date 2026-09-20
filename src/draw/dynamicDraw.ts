@@ -195,7 +195,7 @@ export async function drawAuthorGeneral(
   drawOrnament(rt, ctx, author, link, themeColor);
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -239,7 +239,7 @@ export async function drawAuthorForward(
   drawText(rt, ctx, time, x, y, quality.subTitleFontSize, colors.subTitleColor);
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -503,7 +503,7 @@ export function drawBlockedDefault(rt: DrawRuntime, bgImage: SkImage): SkImage {
   paragraph.delete();
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -611,7 +611,7 @@ export function assembleCard(
   }
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -644,7 +644,7 @@ export function composeDynamicCard(
   ctx.canvas.drawImage(cardImage, 0, 0);
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 

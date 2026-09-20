@@ -6,9 +6,17 @@
  * 且完整暴露 Paragraph API，是 Node 环境下唯一能逐行对齐原实现的渲染后端。
  *
  * 与 JVM 端的重要差异：
- * 1. Embind 对象不受 GC 管理，需显式调用 delete()，否则 WASM 堆会持续增长；
+ * 1. Embind 对象不受 GC 管理，需显式释放，否则 WASM 堆会持续增长；
  * 2. FontMetrics 未导出 capHeight，需另行推导（见 text.ts）；
  * 3. 不带 ICU 的构建无法自行完成 CJK/Emoji 断行，启动时需检测。
+ *
+ * 释放方式分两类（写错就是内存泄漏）：
+ * - Paint / Font / Image / Paragraph 等：调用 delete()；
+ * - Surface：必须调用 dispose()。CanvasKit 的 MakeSurface 是自己 _malloc 一块
+ *   W*H*4 的像素缓冲再 makeRasterDirect，缓冲指针挂在 surface.Ve 上，
+ *   只有 dispose() 会 _free(Ve)；delete() 仅销毁 embind 外壳，像素缓冲会一直留在
+ *   WASM 堆里（1000x2284 一张卡约 9MB），累计几十张后 MakeSurface 直接返回 null，
+ *   报「创建 Surface 失败」。详见 canvaskit-wasm 类型定义中 Surface.dispose 的注释。
  */
 
 import type {
@@ -63,7 +71,12 @@ export function requireCanvasKit(): CK {
   return instance;
 }
 
-/** 对应 Surface.makeRasterN32Premul(w, h) */
+/**
+ * 对应 Surface.makeRasterN32Premul(w, h)
+ *
+ * 注意：返回的 Surface 必须用 dispose() 释放，不能用 delete()——见文件头部说明，
+ * CanvasKit 把 MakeSurface 自行分配的像素缓冲挂在 surface.Ve 上，只有 dispose() 会释放它。
+ */
 export function makeSurface(ck: CK, width: number, height: number): SkSurface {
   const surface = ck.MakeSurface(Math.max(1, Math.round(width)), Math.max(1, Math.round(height)));
   if (!surface) throw new Error(`创建 Surface 失败: ${width}x${height}`);

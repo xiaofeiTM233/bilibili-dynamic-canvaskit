@@ -72,7 +72,7 @@ export async function drawTopic(
   });
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -117,7 +117,7 @@ export async function drawDispute(
   });
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 
@@ -255,7 +255,7 @@ export async function drawContentDesc(
   const cropped = surface.makeImageSnapshot(
     new Int32Array([0, 0, Math.round(rt.cardRect.right - rt.cardRect.left), snapshotHeight]),
   );
-  surface.delete();
+  surface.dispose();
   return cropped;
 }
 
@@ -378,7 +378,7 @@ export async function drawAdditionalCard(
   desc2Paragraph?.delete();
 
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 

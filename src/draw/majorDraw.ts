@@ -196,7 +196,7 @@ export async function drawSmallCard(rt: DrawRuntime, spec: SmallCardSpec): Promi
   titleParagraph.delete();
   descParagraph.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /* ------------------------------------------------------------------ */
@@ -313,7 +313,7 @@ export async function drawArchive(rt: DrawRuntime, a: ArchiveSpec): Promise<SkIm
   titleParagraph.delete();
   descParagraph.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /* ------------------------------------------------------------------ */
@@ -392,7 +392,7 @@ export async function drawNineGrid(rt: DrawRuntime, items: MajorDrawItem[]): Pro
     }
   }
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /* ------------------------------------------------------------------ */
@@ -431,7 +431,7 @@ export async function drawOpus(
   desc.delete();
   draw?.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /** 对应 ModuleDynamic.Major.Common.drawGeneral */
@@ -506,7 +506,7 @@ export async function drawCommon(
   desc1Paragraph.delete();
   desc2Paragraph?.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /** 对应 ModuleDynamic.Major.Article.drawGeneral */
@@ -588,7 +588,7 @@ export async function drawArticle(
   titleParagraph.delete();
   descParagraph.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /** 对应 ModuleDynamic.Major.Music.drawGeneral */
@@ -649,7 +649,7 @@ export async function drawMusic(
   titleParagraph.delete();
   descParagraph.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /** 对应 ModuleDynamic.Major.Blocked.drawGeneral */
@@ -693,7 +693,7 @@ export async function drawBlockedMajor(
   paintParagraph(ctx, hintParagraph, x, y);
   hintParagraph.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /** 对应 drawInfoText：未知类型的提示条 */
@@ -713,7 +713,7 @@ export function drawInfoText(rt: DrawRuntime, text: string): SkImage {
   paintParagraph(ctx, paragraph, quality.cardPadding, quality.contentFontSize + quality.cardPadding / 2);
   paragraph.delete();
   const image = surface.makeImageSnapshot();
-  surface.delete();
+  surface.dispose();
   return image;
 }
 /* ------------------------------------------------------------------ */
