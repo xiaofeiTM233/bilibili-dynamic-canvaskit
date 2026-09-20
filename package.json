@@ -1,6 +1,6 @@
 {
   "name": "bilibili-dynamic-canvaskit",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "基于 Skia（CanvasKit）渲染 B 站动态卡片",
   "license": "AGPL-3.0",
   "repository": {
