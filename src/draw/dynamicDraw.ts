@@ -192,7 +192,10 @@ export async function drawAuthorGeneral(
     }
   }
 
-  drawOrnament(rt, ctx, author, link, themeColor);
+  // 必须 await：drawOrnament 内部要等装饰图下载完成后再绘制，
+  // 漏掉 await 会让它和下面的 makeImageSnapshot/dispose 并发——
+  // 装饰画不进卡片（静默丢失），且会往已释放的画布上写（memory access out of bounds）。
+  await drawOrnament(rt, ctx, author, link, themeColor);
 
   const image = surface.makeImageSnapshot();
   surface.dispose();
