@@ -127,7 +127,7 @@ export async function drawLive(
 
   const fw = rectW(rt.cardRect) - quality.cardOutlineWidth / 2;
   const fallbackUrl = imgApi(live.cover, Math.trunc(fw), Math.trunc(fw * 0.625));
-  const cover = await rt.store.getOrDefault(live.cover, fallbackUrl);
+  const cover = await rt.store.getOrDefault(live.cover, fallbackUrl, 'images');
 
   const height = Math.trunc(
     avatar.height() + quality.contentSpace + (cover.height() * rectW(rt.cardRect)) / cover.width(),

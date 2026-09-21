@@ -126,7 +126,7 @@ export async function drawSmallCard(rt: DrawRuntime, spec: SmallCardSpec): Promi
   const desiredCoverWidth = contentW * 0.4;
   const { imgApi } = await import('../utils/images');
   const fallbackUrl = imgApi(spec.cover, Math.trunc(desiredCoverWidth), 100);
-  const coverImg = await rt.store.getOrDefault(spec.cover, fallbackUrl);
+  const coverImg = await rt.store.getOrDefault(spec.cover, fallbackUrl, 'other');
   const scale = desiredCoverWidth / coverImg.width();
   const scaledCoverHeight = coverImg.height() * scale;
   const textAreaWidth = contentW - quality.cardPadding - desiredCoverWidth;
@@ -232,7 +232,7 @@ export async function drawArchive(rt: DrawRuntime, a: ArchiveSpec): Promise<SkIm
   );
   const { imgApi } = await import('../utils/images');
   const fallbackUrl = imgApi(a.cover, Math.trunc(contentW), Math.trunc(contentW * 0.625));
-  const coverImg = await rt.store.getOrDefault(a.cover, fallbackUrl);
+  const coverImg = await rt.store.getOrDefault(a.cover, fallbackUrl, 'images');
   const videoCoverHeight = (contentW * coverImg.height()) / coverImg.width();
   const videoCardHeight = videoCoverHeight + titleParagraph.getHeight() + descParagraph.getHeight() + quality.cardPadding;
   const videoCardRect: RRect = {
@@ -352,7 +352,7 @@ export async function drawNineGrid(rt: DrawRuntime, items: MajorDrawItem[]): Pro
     const drawItem = items[index];
     const { imgApi } = await import('../utils/images');
     const fallbackUrl = imgApi(drawItem.src, Math.trunc(drawItemWidth), Math.trunc(drawItemHeight));
-    const img = await rt.store.getOrDefault(drawItem.src, fallbackUrl);
+    const img = await rt.store.getOrDefault(drawItem.src, fallbackUrl, 'images');
     const dstRect: RRect = { ...makeXYWH(x, y, drawItemWidth, drawItemHeight), radii: quality.cardArc };
     // 底衬（半透明白）
     fillRRect(ctx, dstRect, withAlpha(WHITE_C, 160));
@@ -462,7 +462,7 @@ export async function drawCommon(
   }
   let x = quality.cardPadding;
   if (c.cover) {
-    const img = await rt.store.get(c.cover);
+    const img = await rt.store.get(c.cover, 'other');
     if (img) {
       const imgRect = insetRR(
         { ...makeXYWH(quality.cardPadding, 1, (quality.additionalCardHeight * img.width()) / img.height(), quality.additionalCardHeight), radii: quality.cardArc },
@@ -554,7 +554,7 @@ export async function drawArticle(
   const { imgApi } = await import('../utils/images');
   if (article.covers.length === 1) {
     const fallbackUrl = imgApi(article.covers[0], Math.trunc(rectWidth(articleCardRect)), Math.trunc(articleCoverHeight));
-    const coverImg = await rt.store.getOrDefault(article.covers[0], fallbackUrl);
+    const coverImg = await rt.store.getOrDefault(article.covers[0], fallbackUrl, 'images');
     drawImageRRectFull(ctx, coverImg, coverRRect);
   } else {
     let imgX = articleCardRect.left;
@@ -563,7 +563,7 @@ export async function drawArticle(
     ctx.canvas.clipRRect(skRRect(rt, coverRRect), rt.ck.ClipOp.Intersect, true);
     for (const cover of article.covers) {
       const fallbackUrl = imgApi(cover, Math.trunc(imgW), Math.trunc(articleCoverHeight));
-      const img = await rt.store.getOrDefault(cover, fallbackUrl);
+      const img = await rt.store.getOrDefault(cover, fallbackUrl, 'images');
       drawImageClip(ctx, img, { ...makeXYWH(imgX, articleCardRect.top, imgW, articleCoverHeight), radii: 0 }, true);
       imgX += rectWidth(articleCardRect) / 3 + 2;
     }
@@ -636,7 +636,7 @@ export async function drawMusic(
   }
   const { imgApi } = await import('../utils/images');
   const fallbackUrl = imgApi(music.cover, Math.trunc(musicCardHeight), Math.trunc(musicCardHeight));
-  const coverImg = await rt.store.getOrDefault(music.cover, fallbackUrl);
+  const coverImg = await rt.store.getOrDefault(music.cover, fallbackUrl, 'images');
   const coverRRect = insetRR(
     { ...makeXYWH(musicCardRect.left, musicCardRect.top, musicCardHeight, musicCardHeight), radii: rt.cardBadgeArc },
     1,
@@ -658,8 +658,8 @@ export async function drawBlockedMajor(
   blocked: { bgImg: { imgDay: string }; icon: { imgDay: string } },
 ): Promise<SkImage> {
   const { quality } = rt;
-  const bgImage = (await rt.store.get(blocked.bgImg.imgDay))!;
-  const lockIcon = (await rt.store.get(blocked.icon.imgDay))!;
+  const bgImage = (await rt.store.get(blocked.bgImg.imgDay, 'images'))!;
+  const lockIcon = (await rt.store.get(blocked.icon.imgDay, 'images'))!;
   const hintParagraph = makeParagraph(
     rt.textEnv,
     {

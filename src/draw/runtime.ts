@@ -35,6 +35,12 @@ export interface RuntimeOptions {
   downloadOriginal?: boolean;
   /** 图片请求头 */
   headers?: Record<string, string>;
+  /** 自定义 fetch（图片/表情下载入口），不传时使用全局 fetch；之前该参数被静默忽略 */
+  fetchImpl?: typeof fetch;
+  /** 图片下载/解码失败的重试次数（不含首次），默认 2 */
+  imageRetries?: number;
+  /** 图片磁盘缓存根目录；传入后下载的图片按分类落盘（images/emoji/user/other），命中后不再联网 */
+  cacheDir?: string;
 }
 
 export interface RuntimeFonts {
@@ -73,7 +79,9 @@ const inflate = (r: Rect, delta: number): Rect =>
   makeLTRB(r.left - delta, r.top - delta, r.right + delta, r.bottom + delta);
 
 export async function createRuntime(ck: CK, options: RuntimeOptions = {}): Promise<DrawRuntime> {
-  const imageConfig = options.imageConfig ?? DEFAULT_IMAGE_CONFIG;
+  // 与默认配置浅合并：调用方只传部分字段（如只改 cardOrnament）时，
+  // 其余字段（colorGenerator 等）不至于缺失而在绘制中段崩溃
+  const imageConfig: ImageConfig = { ...DEFAULT_IMAGE_CONFIG, ...options.imageConfig };
   const badgeEnable = imageConfig.badgeEnable.left || imageConfig.badgeEnable.right;
   const quality = resolveQuality(imageConfig.quality, badgeEnable);
   const colors = expandTheme(resolveTheme(imageConfig.theme));
@@ -146,6 +154,9 @@ export async function createRuntime(ck: CK, options: RuntimeOptions = {}): Promi
     store: new ImageStore(ck, {
       downloadOriginal: options.downloadOriginal,
       headers: options.headers,
+      fetchImpl: options.fetchImpl,
+      retries: options.imageRetries,
+      cacheDir: options.cacheDir,
     }),
   };
 }

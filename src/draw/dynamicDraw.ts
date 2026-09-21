@@ -73,7 +73,7 @@ export async function drawAvatar(
   verifyIcon?: SkImage | null,
 ): Promise<void> {
   const { quality, colors } = rt;
-  const faceImg = face ? await rt.store.get(face) : null;
+  const faceImg = face ? await rt.store.get(face, 'user') : null;
   const hasPendant = !!pendant;
 
   let tarFaceRect: RRect = {
@@ -106,7 +106,7 @@ export async function drawAvatar(
   if (faceImg) drawImageRRectFull(ctx, faceImg, tarFaceRect);
 
   if (hasPendant && pendant) {
-    const pendantImg = await rt.store.get(pendant);
+    const pendantImg = await rt.store.get(pendant, 'user');
     if (pendantImg) {
       const tarPendantRect = makeXYWH(
         tarFaceRect.left + rectW(tarFaceRect) / 2 - quality.pendantSize / 2,
@@ -177,7 +177,7 @@ export async function drawAuthorGeneral(
 
   // 挂件角标（iconBadge），对应原实现中的 iconBadge?.let { ... }
   if (author.iconBadge?.renderImg) {
-    const img = await rt.store.get(author.iconBadge.renderImg);
+    const img = await rt.store.get(author.iconBadge.renderImg, 'images');
     if (img) {
       const iconHeight = quality.subTitleFontSize;
       const iconWidth = (img.width() / img.height()) * iconHeight;
@@ -263,7 +263,7 @@ export async function drawOrnament(
 
   if (ornament === 'FanCard') {
     if (!author.fanCardUrl) return;
-    const fanImg = await rt.store.get(author.fanCardUrl);
+    const fanImg = await rt.store.get(author.fanCardUrl, 'user');
     if (!fanImg) return;
 
     const cardHeight =

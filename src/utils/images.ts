@@ -3,13 +3,19 @@
  *
  * 与原实现的差异：
  * 1. Kotlin 端经 BiliClient（Ktor）下载，此处改用 Node 内置 fetch，请求头可注入；
- * 2. 缓存沿用「先查缓存，未命中则下载」的思路，内存缓存为常驻，磁盘缓存可选；
+ * 2. 缓存分两级：内存常驻 + 磁盘（cacheDir 开启，目录结构对应 CacheType：images/emoji/user/other）；
  * 3. 返回的 Image 由 CanvasKit 解码，生命周期交给调用方（需 delete）。
  */
+
+import fs from 'node:fs';
+import path from 'node:path';
 
 import type { Image as SkImage } from 'canvaskit-wasm';
 
 import type { CK } from '../core/skia';
+
+/** 磁盘缓存分类，对应 mirai CacheType（draw 系列由调用方 cacheImage 自行写入） */
+export type CacheType = 'images' | 'emoji' | 'user' | 'other';
 
 /** 对应 Api.kt 中的 TWEMOJI 常量 */
 export const TWEMOJI_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72';
@@ -24,6 +30,8 @@ export function twemoji(code: string): string {
   return `${TWEMOJI_BASE}/${code}.png`;
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export interface ImageStoreOptions {
   /** 下载原图；关闭时仅使用缩略图接口，对应 cacheConfig.downloadOriginal */
   downloadOriginal?: boolean;
@@ -33,6 +41,8 @@ export interface ImageStoreOptions {
   cacheDir?: string;
   /** 自定义 fetch，便于测试或走代理 */
   fetchImpl?: typeof fetch;
+  /** 下载/解码失败后的重试次数（不含首次），默认 2；403/404/410 不重试 */
+  retries?: number;
 }
 
 /**
@@ -43,7 +53,9 @@ export interface ImageStoreOptions {
  */
 export class ImageStore {
   private readonly memory = new Map<string, SkImage>();
-  private readonly opts: Required<Pick<ImageStoreOptions, 'downloadOriginal' | 'headers'>> &
+  private readonly opts: Required<
+    Pick<ImageStoreOptions, 'downloadOriginal' | 'headers' | 'retries'>
+  > &
     ImageStoreOptions;
   private missImage: SkImage | null = null;
 
@@ -62,22 +74,79 @@ export class ImageStore {
       ...options,
       downloadOriginal: options.downloadOriginal ?? true,
       headers: options.headers ?? defaultHeaders,
+      retries: options.retries ?? 2,
     };
   }
 
-  /** 获取图片，失败返回 null */
-  async get(url: string): Promise<SkImage | null> {
+  /** 同一 URL 的失败只告警一次，避免刷屏 */
+  private readonly warned = new Set<string>();
+
+  private warnOnce(url: string, reason: string): void {
+    if (this.warned.has(url)) return;
+    this.warned.add(url);
+    console.warn(`[bilibili-dynamic-canvaskit] 图片加载失败（${reason}）: ${url}`);
+  }
+
+  /**
+   * 磁盘缓存文件路径，对应 mirai getOrDownload 的命名规则：
+   * 去掉 ?query、去掉 @处理后缀、取路径最后一段。
+   * 如 https://i0.hdslb.com/.../xxx.jpg@940w_587h_1e_1c.png -> xxx.jpg
+   * 这样原图与缩略图共享同一份磁盘缓存。
+   */
+  private cacheFile(url: string, cacheType: CacheType): string | null {
+    if (!this.opts.cacheDir) return null;
+    const name = url.split('?')[0].split('@')[0].split('/').pop() ?? '';
+    if (!name) return null;
+    return path.join(this.opts.cacheDir, cacheType, name);
+  }
+
+  /** 获取图片，失败返回 null；磁盘缓存命中直接读文件，未命中下载后落盘；下载/解码失败自动重试 */
+  async get(url: string, cacheType: CacheType = 'other'): Promise<SkImage | null> {
     if (!url) return null;
+    if (url.startsWith('cache/')) return null; // 本地缓存路径哨兵，对应 mirai
     const cached = this.memory.get(url);
     if (cached) return cached;
 
-    const bytes = await this.download(url);
-    if (!bytes) return null;
+    const file = this.cacheFile(url, cacheType);
+    if (file && fs.existsSync(file)) {
+      try {
+        const image = this.ck.MakeImageFromEncoded(new Uint8Array(fs.readFileSync(file)));
+        if (image) {
+          fs.utimesSync(file, new Date(), new Date()); // 命中即续期，供按天清理
+          this.memory.set(url, image);
+          return image;
+        }
+        // 缓存文件损坏：删掉后走下载
+        fs.unlinkSync(file);
+      } catch {
+        /* 缓存读取失败，走下载 */
+      }
+    }
 
-    const image = this.ck.MakeImageFromEncoded(bytes);
-    if (!image) return null;
-    this.memory.set(url, image);
-    return image;
+    const attempts = 1 + Math.max(0, this.opts.retries);
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const { bytes, permanent } = await this.download(url);
+      if (bytes) {
+        if (file) {
+          try {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, bytes);
+          } catch {
+            /* 磁盘缓存写失败不影响渲染 */
+          }
+        }
+        const image = this.ck.MakeImageFromEncoded(bytes);
+        if (image) {
+          this.memory.set(url, image);
+          return image;
+        }
+        // 字节有效但解码失败：可能是响应被截断，重试重新下载
+      }
+      if (permanent || attempt === attempts) break;
+      await sleep(250 * attempt);
+    }
+    this.warnOnce(url, `下载/解码失败（已尝试 ${attempts} 次）`);
+    return null;
   }
 
   /**
@@ -90,19 +159,30 @@ export class ImageStore {
   }
 
   /** 原图 -> 缩略图 -> 占位图，三级降级 */
-  async getOrDefault(url: string, fallbackUrl: string): Promise<SkImage> {
+  async getOrDefault(url: string, fallbackUrl: string, cacheType: CacheType = 'other'): Promise<SkImage> {
     if (this.opts.downloadOriginal) {
-      const original = await this.get(url);
+      const original = await this.get(url, cacheType);
       if (original) return original;
     }
-    const fallback = await this.get(fallbackUrl);
+    const fallback = await this.get(fallbackUrl, cacheType);
     if (fallback) return fallback;
     return this.getMissImage();
   }
 
-  /** 图片缺失时的占位图，对应 image/IMAGE_MISS.png */
+  /**
+   * 图片缺失时的占位图，对应 image/IMAGE_MISS.png（粉色「!!! 图片资源缺失 !!!」）。
+   * 资源随包附带；万一缺失则退化为 2x2 透明占位图。
+   */
   getMissImage(): SkImage {
     if (this.missImage) return this.missImage;
+    const missPng = path.resolve(__dirname, '..', '..', 'assets', 'image', 'IMAGE_MISS.png');
+    if (fs.existsSync(missPng)) {
+      const image = this.ck.MakeImageFromEncoded(new Uint8Array(fs.readFileSync(missPng)));
+      if (image) {
+        this.missImage = image;
+        return image;
+      }
+    }
     // 生成 2x2 透明占位图，避免依赖外部资源
     const surface = this.ck.MakeSurface(2, 2);
     if (!surface) throw new Error('无法创建占位图 Surface');
@@ -112,15 +192,20 @@ export class ImageStore {
     return image;
   }
 
-  private async download(url: string): Promise<Uint8Array | null> {
+  /**
+   * 下载图片。permanent=true 表示 403/404/410 这类确定性失败，重试也不会成功。
+   */
+  private async download(url: string): Promise<{ bytes: Uint8Array | null; permanent: boolean }> {
     const impl = this.opts.fetchImpl ?? fetch;
     try {
       const response = await impl(url, { headers: this.opts.headers });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        return { bytes: null, permanent: [403, 404, 410].includes(response.status) };
+      }
       const buffer = await response.arrayBuffer();
-      return new Uint8Array(buffer);
+      return { bytes: new Uint8Array(buffer), permanent: false };
     } catch {
-      return null;
+      return { bytes: null, permanent: false };
     }
   }
 

@@ -172,7 +172,7 @@ export async function drawContentDesc(
             loadEmoji: async (name) => {
               // twemoji 贴图分支，对应 getOrDownloadImage(twemoji(et), EMOJI)
               const { TWEMOJI_BASE } = await import('../utils/images');
-              return rt.store.get(`${TWEMOJI_BASE}/${name}.png`);
+              return rt.store.get(`${TWEMOJI_BASE}/${name}.png`, 'emoji');
             },
           },
         );
@@ -183,7 +183,7 @@ export async function drawContentDesc(
 
       case 'RICH_TEXT_NODE_TYPE_EMOJI': {
         if (!node.emoji?.iconUrl) break;
-        const img = await rt.store.get(node.emoji.iconUrl);
+        const img = await rt.store.get(node.emoji.iconUrl, 'emoji');
         if (!img) break;
         const emojiSize = measureLineHeight(rt.fonts.main);
         if (x + emojiSize > textCardRect.right) {
@@ -319,7 +319,7 @@ export async function drawAdditionalCard(
   let x = quality.cardPadding;
 
   if (cover) {
-    const img = await rt.store.get(cover);
+    const img = await rt.store.get(cover, 'other');
     if (img) {
       const imgRect: RRect = {
         ...makeXYWH(
