@@ -529,7 +529,33 @@ export async function drawArticle(
     article.desc ?? '',
     paragraphWidth,
   );
-  const articleCoverHeight = contentW * (article.covers.length === 1 ? 0.35 : 0.23166);
+  const { imgApi } = await import('../utils/images');
+
+  // 先加载封面：单图需要按图片真实比例决定封面区高度
+  let singleImg: SkImage | null = null;
+  const multiImgs: SkImage[] = [];
+  if (article.covers.length === 1) {
+    const fallbackUrl = imgApi(article.covers[0], Math.trunc(contentW), Math.trunc(contentW * 0.35));
+    singleImg = await rt.store.getOrDefault(article.covers[0], fallbackUrl, 'images');
+  } else {
+    const imgW = contentW / 3 - 4;
+    for (const cover of article.covers) {
+      const fallbackUrl = imgApi(cover, Math.trunc(imgW), Math.trunc(contentW * 0.23166));
+      multiImgs.push(await rt.store.getOrDefault(cover, fallbackUrl, 'images'));
+    }
+  }
+
+  const ratioHeight = (img: SkImage) => (contentW * img.height()) / img.width();
+
+  let articleCoverHeight: number;
+  if (article.covers.length === 1) {
+    // 单图：无条件按加载到的图片原始比例，不裁剪不拉伸。
+    // 加载失败时 getOrDefault 返回红色 IMAGE_MISS.png，同样按其自身比例占位。
+    articleCoverHeight = ratioHeight(singleImg!);
+  } else {
+    // 多图为三列拼贴，各格宽度固定，无法同时保留各自比例；行高沿用原固定值，绘制时等比裁剪
+    articleCoverHeight = contentW * 0.23166;
+  }
   const articleCardHeight = articleCoverHeight + titleParagraph.getHeight() + descParagraph.getHeight() + quality.cardPadding;
   const articleCardRect: RRect = {
     ...makeXYWH(quality.cardPadding, quality.badgeHeight + 1, contentW, articleCardHeight),
@@ -551,19 +577,15 @@ export async function drawArticle(
     { ...makeXYWH(articleCardRect.left, articleCardRect.top, contentW, articleCoverHeight), radii: rt.cardBadgeArc },
     1,
   );
-  const { imgApi } = await import('../utils/images');
   if (article.covers.length === 1) {
-    const fallbackUrl = imgApi(article.covers[0], Math.trunc(rectWidth(articleCardRect)), Math.trunc(articleCoverHeight));
-    const coverImg = await rt.store.getOrDefault(article.covers[0], fallbackUrl, 'images');
-    drawImageRRectFull(ctx, coverImg, coverRRect);
+    // 框高即图片原始比例，整图 1:1 映射，无拉伸无裁剪
+    drawImageRRectFull(ctx, singleImg!, coverRRect);
   } else {
     let imgX = articleCardRect.left;
     const imgW = rectWidth(articleCardRect) / 3 - 4;
     ctx.canvas.save();
     ctx.canvas.clipRRect(skRRect(rt, coverRRect), rt.ck.ClipOp.Intersect, true);
-    for (const cover of article.covers) {
-      const fallbackUrl = imgApi(cover, Math.trunc(imgW), Math.trunc(articleCoverHeight));
-      const img = await rt.store.getOrDefault(cover, fallbackUrl, 'images');
+    for (const img of multiImgs) {
       drawImageClip(ctx, img, { ...makeXYWH(imgX, articleCardRect.top, imgW, articleCoverHeight), radii: 0 }, true);
       imgX += rectWidth(articleCardRect) / 3 + 2;
     }
