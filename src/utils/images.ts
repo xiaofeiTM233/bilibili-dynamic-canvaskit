@@ -3,7 +3,8 @@
  *
  * 与原实现的差异：
  * 1. Kotlin 端经 BiliClient（Ktor）下载，此处改用 Node 内置 fetch，请求头可注入；
- * 2. 缓存分两级：内存常驻 + 磁盘（cacheDir 开启，目录结构对应 CacheType：images/emoji/user/other）；
+ * 2. 缓存分两级：磁盘为主（cacheDir 开启，目录结构对应 CacheType：images/emoji/user/other），
+ *    内存只做「一次渲染内」的短时复用，空闲超过 memoryIdleMs（默认 60 秒）即释放，下次从磁盘重读；
  * 3. 返回的 Image 由 CanvasKit 解码，生命周期交给调用方（需 delete）。
  */
 
@@ -43,6 +44,17 @@ export interface ImageStoreOptions {
   fetchImpl?: typeof fetch;
   /** 下载/解码失败后的重试次数（不含首次），默认 2；403/404/410 不重试 */
   retries?: number;
+  /**
+   * 内存缓存条目上限（张数），默认 50。空闲淘汰之外的兜底，
+   * 防止单次渲染批量加载（九宫格等）时瞬时解码位图过多。
+   */
+  maxMemoryImages?: number;
+  /**
+   * 内存缓存空闲存活时间（毫秒），默认 60000。
+   * 内存不长期驻留：超过该时间没有被再次取用的图片会被释放，
+   * 下次需要时从磁盘缓存重新读取（cacheDir 未开启时则重新下载）。
+   */
+  memoryIdleMs?: number;
 }
 
 /**
@@ -53,8 +65,13 @@ export interface ImageStoreOptions {
  */
 export class ImageStore {
   private readonly memory = new Map<string, SkImage>();
+  /** url -> 最后取用时间（毫秒），用于空闲淘汰与 LRU 兜底 */
+  private readonly lastUsed = new Map<string, number>();
   private readonly opts: Required<
-    Pick<ImageStoreOptions, 'downloadOriginal' | 'headers' | 'retries'>
+    Pick<
+      ImageStoreOptions,
+      'downloadOriginal' | 'headers' | 'retries' | 'maxMemoryImages' | 'memoryIdleMs'
+    >
   > &
     ImageStoreOptions;
   private missImage: SkImage | null = null;
@@ -75,6 +92,8 @@ export class ImageStore {
       downloadOriginal: options.downloadOriginal ?? true,
       headers: options.headers ?? defaultHeaders,
       retries: options.retries ?? 2,
+      maxMemoryImages: options.maxMemoryImages ?? 50,
+      memoryIdleMs: options.memoryIdleMs ?? 60_000,
     };
   }
 
@@ -104,8 +123,12 @@ export class ImageStore {
   async get(url: string, cacheType: CacheType = 'other'): Promise<SkImage | null> {
     if (!url) return null;
     if (url.startsWith('cache/')) return null; // 本地缓存路径哨兵，对应 mirai
+    this.pruneIdle(); // 先回收空闲超过 memoryIdleMs 的条目
     const cached = this.memory.get(url);
-    if (cached) return cached;
+    if (cached) {
+      this.lastUsed.set(url, Date.now());
+      return cached;
+    }
 
     const file = this.cacheFile(url, cacheType);
     if (file && fs.existsSync(file)) {
@@ -113,7 +136,7 @@ export class ImageStore {
         const image = this.ck.MakeImageFromEncoded(new Uint8Array(fs.readFileSync(file)));
         if (image) {
           fs.utimesSync(file, new Date(), new Date()); // 命中即续期，供按天清理
-          this.memory.set(url, image);
+          this.remember(url, image);
           return image;
         }
         // 缓存文件损坏：删掉后走下载
@@ -137,7 +160,7 @@ export class ImageStore {
         }
         const image = this.ck.MakeImageFromEncoded(bytes);
         if (image) {
-          this.memory.set(url, image);
+          this.remember(url, image);
           return image;
         }
         // 字节有效但解码失败：可能是响应被截断，重试重新下载
@@ -149,13 +172,63 @@ export class ImageStore {
     return null;
   }
 
+  /** 记入内存缓存（含最后取用时间），并按条目上限兜底淘汰最久未用 */
+  private remember(url: string, image: SkImage): void {
+    this.lastUsed.set(url, Date.now());
+    this.memory.set(url, image);
+    while (this.memory.size > this.opts.maxMemoryImages) {
+      const oldest = this.oldestKey();
+      if (oldest === undefined) break;
+      this.release(oldest);
+    }
+  }
+
+  /** 最近最少使用的 url */
+  private oldestKey(): string | undefined {
+    let oldest: string | undefined;
+    let at = Number.POSITIVE_INFINITY;
+    for (const [url, time] of this.lastUsed) {
+      if (time < at) {
+        at = time;
+        oldest = url;
+      }
+    }
+    return oldest;
+  }
+
+  /** 从内存缓存移除并释放解码位图 */
+  private release(url: string): void {
+    const image = this.memory.get(url);
+    this.memory.delete(url);
+    this.lastUsed.delete(url);
+    image?.delete();
+  }
+
+  /**
+   * 释放空闲超过 ttlMs 的内存缓存，返回释放张数；每次 get 前自动调用一次。
+   *
+   * 内存只承担「一次渲染内」的复用（同一张图在一次渲染里可能被取用多次）；
+   * 之后一律回到磁盘缓存重读，避免长驻进程里解码位图越积越多。
+   * ttlMs 传 0 表示立即清空内存缓存（仅保留已释放过的占位图）。
+   */
+  pruneIdle(ttlMs: number = this.opts.memoryIdleMs): number {
+    const deadline = Date.now() - ttlMs;
+    let released = 0;
+    for (const [url, at] of [...this.lastUsed]) {
+      if (at > deadline) continue;
+      this.release(url);
+      released++;
+    }
+    return released;
+  }
+
   /**
    * 将调用方已持有的图片注入缓存，后续 get/getOrDefault 直接命中。
    * 便于演示与集成场景复用预生成的图片（避免再次解码/下载）。
    * 注入的图片生命周期仍由调用方负责（dispose 时会统一释放）。
    */
   register(url: string, image: SkImage): void {
-    this.memory.set(url, image);
+    this.remember(url, image);
   }
 
   /** 原图 -> 缩略图 -> 占位图，三级降级 */
@@ -213,6 +286,7 @@ export class ImageStore {
   dispose(): void {
     for (const image of this.memory.values()) image.delete();
     this.memory.clear();
+    this.lastUsed.clear();
     if (this.missImage) {
       this.missImage.delete();
       this.missImage = null;

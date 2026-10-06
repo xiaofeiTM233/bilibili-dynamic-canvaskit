@@ -39,6 +39,13 @@ export interface RuntimeOptions {
   fetchImpl?: typeof fetch;
   /** 图片下载/解码失败的重试次数（不含首次），默认 2 */
   imageRetries?: number;
+  /** 图片内存缓存条目上限（张数），默认 50；空闲淘汰之外的兜底 */
+  imageMemoryLimit?: number;
+  /**
+   * 图片内存缓存空闲存活时间（毫秒），默认 60000。
+   * 内存只做单次渲染内的复用，空闲超时的图片会被释放、下次从磁盘缓存重读
+   */
+  imageMemoryIdleMs?: number;
   /** 图片磁盘缓存根目录；传入后下载的图片按分类落盘（images/emoji/user/other），命中后不再联网 */
   cacheDir?: string;
 }
@@ -157,6 +164,8 @@ export async function createRuntime(ck: CK, options: RuntimeOptions = {}): Promi
       fetchImpl: options.fetchImpl,
       retries: options.imageRetries,
       cacheDir: options.cacheDir,
+      maxMemoryImages: options.imageMemoryLimit,
+      memoryIdleMs: options.imageMemoryIdleMs,
     }),
   };
 }
