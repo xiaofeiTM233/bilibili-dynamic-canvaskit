@@ -35,10 +35,10 @@ export type SkFontMgr = FontMgrType;
 
 let instance: CK | null = null;
 
-/** 定位 canvaskit.wasm；利用包自身的 exports 映射，避免硬编码 node_modules 路径 */
+/** 用 full 构建：标准构建未编入 JPEG/WebP 编码器，encodeToBytes 对二者返回 null */
 function resolveWasm(file: string): string {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require.resolve(`canvaskit-wasm/bin/${file}`);
+  return require.resolve(`canvaskit-wasm/bin/full/${file}`);
 }
 
 export async function initCanvasKit(): Promise<CK> {
@@ -46,7 +46,7 @@ export async function initCanvasKit(): Promise<CK> {
 
   // 动态 require：canvaskit-wasm 的加载器为 UMD，需在运行时引入
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const CanvasKitInit = require('canvaskit-wasm/bin/canvaskit.js') as (opts: {
+  const CanvasKitInit = require('canvaskit-wasm/full') as (opts: {
     locateFile: (file: string) => string;
   }) => Promise<CK>;
 
