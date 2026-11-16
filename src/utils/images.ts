@@ -147,7 +147,9 @@ export class ImageStore {
     }
 
     const attempts = 1 + Math.max(0, this.opts.retries);
+    let used = 0;
     for (let attempt = 1; attempt <= attempts; attempt++) {
+      used = attempt;
       const { bytes, permanent } = await this.download(url);
       if (bytes) {
         if (file) {
@@ -168,7 +170,8 @@ export class ImageStore {
       if (permanent || attempt === attempts) break;
       await sleep(250 * attempt);
     }
-    this.warnOnce(url, `下载/解码失败（已尝试 ${attempts} 次）`);
+    // 未跑满次数即说明遇到 403/404/410 这类确定性失败，直接中断
+    this.warnOnce(url, used < attempts ? '资源不存在（403/404/410，未重试）' : `下载/解码失败（已尝试 ${used} 次）`);
     return null;
   }
 

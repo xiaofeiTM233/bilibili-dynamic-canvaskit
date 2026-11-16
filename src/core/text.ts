@@ -258,6 +258,9 @@ export async function drawTextArea(
           ctx.ck.FilterMode.Linear,
           ctx.ck.MipmapMode.None,
         );
+      } else {
+        // 贴图缺失（Twemoji 无此码位资源）时退回正文字形，避免文字变成空白
+        ctx.canvas.drawText(node.value, x, y, paint, font);
       }
       x += emojiHeight;
     }
